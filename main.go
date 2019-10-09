@@ -17,10 +17,10 @@ import (
 const DataDogBaseUrl = "https://http-intake.logs.datadoghq.com/v1/input/"
 
 func main() {
-	var apiKey, path, stage, branch, service, testRunTitle string
+	var apiKey, cucumberPath, stage, branch, service, testRunTitle string
 
 	flag.StringVar(&apiKey, "apikey", "", "string")
-	flag.StringVar(&path, "path", "", "string")
+	flag.StringVar(&cucumberPath, "cucumberPath", "", "string")
 	flag.StringVar(&stage, "stage", "", "string")
 	flag.StringVar(&branch, "branch", "local", "string")
 	flag.StringVar(&service, "service", "", "string")
@@ -28,12 +28,8 @@ func main() {
 
 	flag.Parse()
 
-	fmt.Println(path)
+	fmt.Println(cucumberPath)
 
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		fmt.Printf("ERROR: %s", err.Error())
-		return
-	}
 	if stage == "" {
 		fmt.Printf("stage not set")
 		return
@@ -51,7 +47,7 @@ func main() {
 		return
 	}
 
-	testResults, err := parseCucumberFiles(path)
+	testResults, err := parseCucumberFiles(cucumberPath)
 	if err!= nil {
 		fmt.Println(error.Error)
 		return
