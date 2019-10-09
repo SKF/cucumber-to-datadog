@@ -56,12 +56,15 @@ func main() {
 	dt := time.Now()
 
 	for _, testResult := range testResults {
+		fmt.Printf("TestResult: %+v\n", testResult.Name)
 		featureOutcome := "passed"
 		featureErrorMessage := ""
 		for _, element := range testResult.Elements {
+			fmt.Printf("Element: %+v\n", element.Name)
 			scenarioOutcome := "passed"
 			scenarioErrorMessage := ""
 			for _, step := range element.Steps {
+				fmt.Printf("Step: %+v\n", step.Name)
 				if step.Result.Status == "failed" {
 					scenarioOutcome = "failed"
 					scenarioErrorMessage = strings.Split(step.Result.ErrorMessage, "\n")[0]
@@ -83,9 +86,8 @@ func main() {
 					Branch:       branch,
 					TestRunTitle: testRunTitle,
 				}
-				fmt.Printf("%+v\n", ddStep)
 				if ddStep.Outcome != "skipped" {
-					if err,_ := sendToDatadog(ddStep, apiKey); err!= nil {
+					if err:= sendToDatadog(ddStep, apiKey); err!= nil {
 						fmt.Println(err.Error())
 						return
 					}
@@ -105,11 +107,10 @@ func main() {
 				Branch:       branch,
 				TestRunTitle: testRunTitle,
 			}
-			if err,_ := sendToDatadog(ddScenario, apiKey); err!= nil {
+			if err := sendToDatadog(ddScenario, apiKey); err!= nil {
 				fmt.Println(err.Error())
 				return
 			}
-			fmt.Printf("%+v\n", ddScenario)
 		}
 		ddFeature := models.DatadogFeatureResult{
 			Service:      service,
@@ -124,21 +125,18 @@ func main() {
 			Branch:       branch,
 			TestRunTitle: testRunTitle,
 		}
-		if err,_ := sendToDatadog(ddFeature, apiKey); err!= nil {
+		if err := sendToDatadog(ddFeature, apiKey); err!= nil {
 			fmt.Println(err.Error())
 			return
 		}
-		fmt.Printf("%+v\n", ddFeature)
 	}
 }
 
-func sendToDatadog(testResult interface{}, datadogApiKey string) (err error, response interface{}) {
-
+func sendToDatadog(testResult interface{}, datadogApiKey string) (err error) {
 	buf := &bytes.Buffer{}
 	if err = json.NewEncoder(buf).Encode(testResult); err != nil {
 		return
 	}
-
 	url := DataDogBaseUrl + datadogApiKey
 	req, err := http.NewRequest("POST", url, buf)
 	if err != nil {
@@ -147,17 +145,10 @@ func sendToDatadog(testResult interface{}, datadogApiKey string) (err error, res
 
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
-
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return fmt.Errorf("error response code: %v", resp.StatusCode), nil
-	}
-
-	if resp.ContentLength != 0 {
-		if err = json.NewDecoder(resp.Body).Decode(response); err != nil {
-			return
-		}
+		return fmt.Errorf("error response code: %v", resp.StatusCode)
 	}
 	return
 }
