@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -37,7 +38,7 @@ func main() {
 		fmt.Printf("stage not set")
 		return
 	}
-	if DataDogBaseUrl == "" {
+	if apiKey == "" {
 		fmt.Printf("datadog api-key not set")
 		return
 	}
@@ -50,17 +51,11 @@ func main() {
 		return
 	}
 
-	jsonFile, err := os.Open(path)
-	if err != nil {
-		fmt.Printf("ERROR: %s", err.Error())
+	testResults, err := parseCucumberFiles(path)
+	if err!= nil {
+		fmt.Println(error.Error)
 		return
 	}
-	defer jsonFile.Close()
-
-	byteValue, _ := ioutil.ReadAll(jsonFile)
-
-	var testResults []models.CucumberTestResult
-	json.Unmarshal(byteValue, &testResults)
 
 	dt := time.Now()
 
@@ -94,7 +89,10 @@ func main() {
 				}
 				fmt.Printf("%+v\n", ddStep)
 				if ddStep.Outcome != "skipped" {
-					sendToDatadog(ddStep, apiKey)
+					if err,_ := sendToDatadog(ddStep, apiKey); err!= nil {
+						fmt.Println(err.Error())
+						return
+					}
 				}
 			}
 			ddScenario := models.DatadogScenarioResult{
@@ -111,7 +109,10 @@ func main() {
 				Branch:       branch,
 				TestRunTitle: testRunTitle,
 			}
-			sendToDatadog(ddScenario, apiKey)
+			if err,_ := sendToDatadog(ddScenario, apiKey); err!= nil {
+				fmt.Println(err.Error())
+				return
+			}
 			fmt.Printf("%+v\n", ddScenario)
 		}
 		ddFeature := models.DatadogFeatureResult{
@@ -127,7 +128,10 @@ func main() {
 			Branch:       branch,
 			TestRunTitle: testRunTitle,
 		}
-		sendToDatadog(ddFeature, apiKey)
+		if err,_ := sendToDatadog(ddFeature, apiKey); err!= nil {
+			fmt.Println(err.Error())
+			return
+		}
 		fmt.Printf("%+v\n", ddFeature)
 	}
 }
@@ -157,6 +161,49 @@ func sendToDatadog(testResult interface{}, datadogApiKey string) (err error, res
 	if resp.ContentLength != 0 {
 		if err = json.NewDecoder(resp.Body).Decode(response); err != nil {
 			return
+		}
+	}
+	return
+}
+
+func parseCucumberFiles(path string) (testResults []models.CucumberTestResult, err error) {
+
+	fmt.Println(path)
+
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return nil, err
+	}
+
+	dir, err := os.Open(path)
+	if err != nil {
+		return
+	}
+	defer dir.Close()
+
+	files, err := dir.Readdir(-1)
+	if err != nil {
+		return
+	}
+
+	for _, file := range files {
+		matched, _ := filepath.Match("*.cucumber.json", file.Name())
+
+		if matched {
+			fmt.Println(file.Name())
+			jsonFile, err := os.Open(filepath.Join(path, file.Name()))
+			if err != nil {
+				return nil, err
+			}
+			defer jsonFile.Close()
+
+			byteValue, _ := ioutil.ReadAll(jsonFile)
+
+			var featureTestResults []models.CucumberTestResult
+			json.Unmarshal(byteValue, &featureTestResults)
+
+			for _, testResult := range featureTestResults {
+				testResults = append(testResults, testResult)
+			}
 		}
 	}
 	return
