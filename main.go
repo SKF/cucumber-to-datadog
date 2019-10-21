@@ -44,23 +44,29 @@ func main() {
 	}
 
 	testResults, err := parseCucumberFiles(cucumberPath)
-	if err!= nil {
+	if err != nil {
 		fmt.Println(error.Error)
 		return
 	}
 	dt := time.Now()
 
 	for _, testResult := range testResults {
-		fmt.Printf("TestResult: %+v\n", testResult.Name)
+		fmt.Printf("Feature: %+v\n", testResult.Name)
 		featureOutcome := "passed"
 		featureErrorMessage := ""
 
 		scenarioProperties := getScenarioProperties(testResult.Elements)
 
 		for scenarioIndex, element := range testResult.Elements {
-			fmt.Printf("Element: %+v\n", element.Name)
+			scenarioName := element.Name //strings.Replace(element.Name, " ", "_", -1)
+			if properties, hasProperties := scenarioProperties[scenarioIndex]; hasProperties {
+				scenarioName += " - (" + strings.Join(properties, ",") + ")"
+			}
+
+			fmt.Printf("Scenario: %+v\n", scenarioName)
 			scenarioOutcome := "passed"
 			scenarioErrorMessage := ""
+
 			for _, step := range element.Steps {
 				fmt.Printf("Step: %+v\n", step.Name)
 				if step.Result.Status == "failed" {
@@ -77,7 +83,7 @@ func main() {
 					Date:         dt.Format("2006-01-02"),
 					DateTime:     dt.Format("2006-01-02 15:04:05"),
 					Feature:      strings.Replace(testResult.Name, " ", "_", -1),
-					Scenario:     strings.Replace(element.Name, " ", "_", -1),
+					Scenario:     scenarioName,
 					Step:         step.Keyword + step.Name,
 					Outcome:      step.Result.Status,
 					ErrorMessage: strings.Split(step.Result.ErrorMessage, "\n")[0],
@@ -85,7 +91,7 @@ func main() {
 					TestRunTitle: testRunTitle,
 				}
 				if ddStep.Outcome != "skipped" {
-					if err:= sendToDatadog(ddStep, apiKey); err!= nil {
+					if err := sendToDatadog(ddStep, apiKey); err != nil {
 						fmt.Println(err.Error())
 						return
 					}
@@ -99,18 +105,14 @@ func main() {
 				Date:         dt.Format("2006-01-02"),
 				DateTime:     dt.Format("2006-01-02 15:04:05"),
 				Feature:      strings.Replace(testResult.Name, " ", "_", -1),
-				Scenario:     strings.Replace(element.Name, " ", "_", -1),
+				Scenario:     scenarioName,
 				Outcome:      scenarioOutcome,
 				ErrorMessage: scenarioErrorMessage,
 				Branch:       branch,
 				TestRunTitle: testRunTitle,
 			}
 
-			if properties, hasProperties := scenarioProperties[scenarioIndex]; hasProperties {
-				ddScenario.Scenario += "_(" + strings.Join(properties, ",") + ")"
-			}
-
-			if err := sendToDatadog(ddScenario, apiKey); err!= nil {
+			if err := sendToDatadog(ddScenario, apiKey); err != nil {
 				fmt.Println(err.Error())
 				return
 			}
@@ -129,7 +131,7 @@ func main() {
 			TestRunTitle: testRunTitle,
 		}
 
-		if err := sendToDatadog(ddFeature, apiKey); err!= nil {
+		if err := sendToDatadog(ddFeature, apiKey); err != nil {
 			fmt.Println(err.Error())
 			return
 		}
