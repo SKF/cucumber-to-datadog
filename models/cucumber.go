@@ -8,9 +8,9 @@ type CucumberTestResult struct {
 }
 
 type Element struct {
-	Name    string `json:"name"`
-	Keyword string `json:"keyword"`
-	Steps   []Step `json:"steps"`
+	Name               string `json:"name"`
+	Keyword            string `json:"keyword"`
+	Steps              []Step `json:"steps"`
 }
 
 type Step struct {

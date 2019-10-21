@@ -48,14 +48,16 @@ func main() {
 		fmt.Println(error.Error)
 		return
 	}
-
 	dt := time.Now()
 
 	for _, testResult := range testResults {
 		fmt.Printf("TestResult: %+v\n", testResult.Name)
 		featureOutcome := "passed"
 		featureErrorMessage := ""
-		for _, element := range testResult.Elements {
+
+		scenarioProperties := getScenarioProperties(testResult.Elements)
+
+		for scenarioIndex, element := range testResult.Elements {
 			fmt.Printf("Element: %+v\n", element.Name)
 			scenarioOutcome := "passed"
 			scenarioErrorMessage := ""
@@ -103,6 +105,11 @@ func main() {
 				Branch:       branch,
 				TestRunTitle: testRunTitle,
 			}
+
+			if properties, hasProperties := scenarioProperties[scenarioIndex]; hasProperties {
+				ddScenario.Scenario += "_(" + strings.Join(properties, ",") + ")"
+			}
+
 			if err := sendToDatadog(ddScenario, apiKey); err!= nil {
 				fmt.Println(err.Error())
 				return
@@ -121,6 +128,7 @@ func main() {
 			Branch:       branch,
 			TestRunTitle: testRunTitle,
 		}
+
 		if err := sendToDatadog(ddFeature, apiKey); err!= nil {
 			fmt.Println(err.Error())
 			return
@@ -150,9 +158,7 @@ func sendToDatadog(testResult interface{}, datadogApiKey string) (err error) {
 }
 
 func parseCucumberFiles(path string) (testResults []models.CucumberTestResult, err error) {
-
 	fmt.Println(path)
-
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return nil, err
 	}
@@ -167,10 +173,8 @@ func parseCucumberFiles(path string) (testResults []models.CucumberTestResult, e
 	if err != nil {
 		return
 	}
-
 	for _, file := range files {
 		matched, _ := filepath.Match("*.cucumber.json", file.Name())
-
 		if matched {
 			fmt.Println(file.Name())
 			jsonFile, err := os.Open(filepath.Join(path, file.Name()))
@@ -178,16 +182,76 @@ func parseCucumberFiles(path string) (testResults []models.CucumberTestResult, e
 				return nil, err
 			}
 			defer jsonFile.Close()
-
 			byteValue, _ := ioutil.ReadAll(jsonFile)
-
 			var featureTestResults []models.CucumberTestResult
 			json.Unmarshal(byteValue, &featureTestResults)
-
 			for _, testResult := range featureTestResults {
 				testResults = append(testResults, testResult)
 			}
 		}
 	}
 	return
+}
+
+func getScenarioProperties(elements []models.Element) (output map[int][]string) {
+
+	var scenarios []models.ScenarioProperties
+	for i, element := range elements {
+		scenario := models.ScenarioProperties{
+			Scenario: element.Name,
+			Steps:    make(map[int]models.StepProperties),
+		}
+
+		for stepIndex, step := range element.Steps {
+			stepWithoutProperties := ""
+			stepProperties := make(map[int]string)
+			for i, stepPart := range strings.Split(step.Name, "\"") {
+				if i%2 == 0 { // skip even numbers
+					stepWithoutProperties += stepPart
+				} else {
+					stepProperties[i] = stepPart
+				}
+			}
+			scenario.Steps[stepIndex] = models.StepProperties{
+				Step:       stepWithoutProperties,
+				Properties: stepProperties,
+			}
+		}
+		for j, existingScenario := range scenarios {
+			if element.Name == existingScenario.Scenario {
+				scenarios[j].DuplicateScenarioIndexes = append(scenarios[j].DuplicateScenarioIndexes, i)
+				scenarios[j].HasProperties = true
+				scenario.DuplicateScenarioIndexes = append(scenario.DuplicateScenarioIndexes, j)
+				scenario.HasProperties = true
+			}
+		}
+		scenarios = append(scenarios, scenario)
+	}
+
+	output = make(map[int][]string)
+
+	for i, scenario := range scenarios {
+		if scenario.HasProperties {
+			var properties []string
+			for line, step := range scenario.Steps {
+				for _, duplicateIndex := range scenario.DuplicateScenarioIndexes {
+					for propertyIndex, stepProperty := range step.Properties {
+						if stepProperty != scenarios[duplicateIndex].Steps[line].Properties[propertyIndex] {
+							propExists := false
+							for _, existingProps := range properties {
+								if existingProps == stepProperty {
+									propExists = true
+								}
+							}
+							if !propExists {
+								properties = append(properties, stepProperty)
+							}
+						}
+					}
+				}
+			}
+			output[i] = properties
+		}
+	}
+	return output
 }
