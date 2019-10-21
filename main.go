@@ -21,7 +21,7 @@ func main() {
 
 	flag.StringVar(&apiKey, "apikey", "", "string")
 	flag.StringVar(&cucumberPath, "cucumberPath", "", "string")
-	flag.StringVar(&stage, "stage", "", "string")
+	flag.StringVar(&stage, "stage", "local", "string")
 	flag.StringVar(&branch, "branch", "local", "string")
 	flag.StringVar(&service, "service", "", "string")
 	flag.StringVar(&testRunTitle, "testRunTitle", "", "string")
@@ -30,10 +30,6 @@ func main() {
 
 	fmt.Println(cucumberPath)
 
-	if stage == "" {
-		fmt.Printf("stage not set")
-		return
-	}
 	if apiKey == "" {
 		fmt.Printf("datadog api-key not set")
 		return
