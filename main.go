@@ -23,7 +23,7 @@ func main() {
 	flag.StringVar(&branch, "branch", "local", "string")
 	flag.StringVar(&service, "service", "", "string")
 	flag.StringVar(&testRunTitle, "testRunTitle", "", "string")
-	flag.StringVar(&region, "region", "us", "string")
+	flag.StringVar(&region, "region", "eu", "string")
 
 	flag.Parse()
 
@@ -54,11 +54,10 @@ func main() {
 
 	testResults, err := parseCucumberFiles(cucumberPath)
 	if err != nil {
-		fmt.Println(error.Error)
+		fmt.Println(err.Error())
 		return
 	}
 	dt := time.Now()
-
 	for _, testResult := range testResults {
 		fmt.Printf("Feature: %+v\n", testResult.Name)
 		featureOutcome := "passed"
@@ -195,7 +194,10 @@ func parseCucumberFiles(path string) (testResults []models.CucumberTestResult, e
 			defer jsonFile.Close()
 			byteValue, _ := ioutil.ReadAll(jsonFile)
 			var featureTestResults []models.CucumberTestResult
-			json.Unmarshal(byteValue, &featureTestResults)
+			err = json.Unmarshal(byteValue, &featureTestResults)
+			if err != nil {
+				return nil, err
+			}
 			for _, testResult := range featureTestResults {
 				testResults = append(testResults, testResult)
 			}
