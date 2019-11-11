@@ -14,10 +14,8 @@ import (
 	"time"
 )
 
-const DataDogBaseUrl = "https://http-intake.logs.datadoghq.com/v1/input/"
-
 func main() {
-	var apiKey, cucumberPath, stage, branch, service, testRunTitle string
+	var apiKey, cucumberPath, stage, branch, service, testRunTitle, region, url string
 
 	flag.StringVar(&apiKey, "apikey", "", "string")
 	flag.StringVar(&cucumberPath, "cucumberPath", "", "string")
@@ -25,6 +23,7 @@ func main() {
 	flag.StringVar(&branch, "branch", "local", "string")
 	flag.StringVar(&service, "service", "", "string")
 	flag.StringVar(&testRunTitle, "testRunTitle", "", "string")
+	flag.StringVar(&region, "region", "eu", "string")
 
 	flag.Parse()
 
@@ -43,13 +42,22 @@ func main() {
 		return
 	}
 
+	switch region {
+	case "eu":
+		url = "https://http-intake.logs.datadoghq.eu/v1/input/"
+	case "us":
+		url = "https://http-intake.logs.datadoghq.com/v1/input/"
+	default:
+		fmt.Printf("region %s hasn't been implemented", region)
+		return
+	}
+
 	testResults, err := parseCucumberFiles(cucumberPath)
 	if err != nil {
-		fmt.Println(error.Error)
+		fmt.Println(err.Error())
 		return
 	}
 	dt := time.Now()
-
 	for _, testResult := range testResults {
 		fmt.Printf("Feature: %+v\n", testResult.Name)
 		featureOutcome := "passed"
@@ -91,7 +99,7 @@ func main() {
 					TestRunTitle: testRunTitle,
 				}
 				if ddStep.Outcome != "skipped" {
-					if err := sendToDatadog(ddStep, apiKey); err != nil {
+					if err := sendToDatadog(ddStep, apiKey, url); err != nil {
 						fmt.Println(err.Error())
 						return
 					}
@@ -112,7 +120,7 @@ func main() {
 				TestRunTitle: testRunTitle,
 			}
 
-			if err := sendToDatadog(ddScenario, apiKey); err != nil {
+			if err := sendToDatadog(ddScenario, apiKey, url); err != nil {
 				fmt.Println(err.Error())
 				return
 			}
@@ -131,19 +139,19 @@ func main() {
 			TestRunTitle: testRunTitle,
 		}
 
-		if err := sendToDatadog(ddFeature, apiKey); err != nil {
+		if err := sendToDatadog(ddFeature, apiKey, url); err != nil {
 			fmt.Println(err.Error())
 			return
 		}
 	}
 }
 
-func sendToDatadog(testResult interface{}, datadogApiKey string) (err error) {
+func sendToDatadog(testResult interface{}, datadogApiKey, datadogUrl string) (err error) {
 	buf := &bytes.Buffer{}
 	if err = json.NewEncoder(buf).Encode(testResult); err != nil {
 		return
 	}
-	url := DataDogBaseUrl + datadogApiKey
+	url := datadogUrl + datadogApiKey
 	req, err := http.NewRequest("POST", url, buf)
 	if err != nil {
 		return
@@ -186,7 +194,10 @@ func parseCucumberFiles(path string) (testResults []models.CucumberTestResult, e
 			defer jsonFile.Close()
 			byteValue, _ := ioutil.ReadAll(jsonFile)
 			var featureTestResults []models.CucumberTestResult
-			json.Unmarshal(byteValue, &featureTestResults)
+			err = json.Unmarshal(byteValue, &featureTestResults)
+			if err != nil {
+				return nil, err
+			}
 			for _, testResult := range featureTestResults {
 				testResults = append(testResults, testResult)
 			}

@@ -42,3 +42,4 @@ Option | Required | Description
 --service | Yes | The name of the service
 --testRunTitle | Yes | The title of the test-run
 --apiKey | Yes | Your datadog api key
+--region | No | The region for datadog, default value = eu, available values: eu, us
