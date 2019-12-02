@@ -74,6 +74,8 @@ func main() {
 			fmt.Printf("Scenario: %+v\n", scenarioName)
 			scenarioOutcome := "passed"
 			scenarioErrorMessage := ""
+			scenarioEndpoint := getScenarioEndpoint(element)
+			scenarioMethod := getScenarioMethod(element)
 
 			for _, step := range element.Steps {
 				fmt.Printf("Step: %+v\n", step.Name)
@@ -118,6 +120,8 @@ func main() {
 				ErrorMessage: scenarioErrorMessage,
 				Branch:       branch,
 				TestRunTitle: testRunTitle,
+				Endpoint:     scenarioEndpoint,
+				Method:       scenarioMethod,
 			}
 
 			if err := sendToDatadog(ddScenario, apiKey, url); err != nil {
@@ -267,4 +271,32 @@ func getScenarioProperties(elements []models.Element) (output map[int][]string) 
 		}
 	}
 	return output
+}
+
+func getScenarioMethod(scenario models.Element) string {
+	for _, step := range scenario.Steps {
+		for i, stepPart := range strings.Split(step.Name, "\"") {
+			if i%2 != 0 { // skip odd numbers
+				method := strings.ToUpper(stepPart)
+				if method == "GET" || method == "POST" || method == "DELETE" || method == "PUT" {
+					return method
+				}
+
+			}
+		}
+	}
+	return ""
+}
+
+func getScenarioEndpoint(scenario models.Element) string {
+	for _, step := range scenario.Steps {
+		for i, stepPart := range strings.Split(step.Name, "\"") {
+			if i%2 != 0 { // skip odd numbers
+				if strings.HasPrefix(stepPart, "/") {
+					return stepPart
+				}
+			}
+		}
+	}
+	return ""
 }

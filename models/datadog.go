@@ -29,6 +29,8 @@ type DatadogScenarioResult struct {
 	ErrorMessage string `json:"error_message"`
 	Branch       string `json:"branch"`
 	TestRunTitle string `json:"testruntitle"`
+	Endpoint     string `json:"endpoint"`
+	Method       string `json:"method"`
 }
 
 type DatadogFeatureResult struct {
